@@ -14,6 +14,8 @@ matplotlib>=3.5.0
 # Jupyter notebook support (optional, for local development)
 jupyter>=1.0.0
 ipykernel>=6.0.0
+ipywidgets>=8.1.0
+IPython>=8.12.0
 
 # Google Colab support (optional, for Colab users)
 # Note: google-colab is automatically available in Colab environment
