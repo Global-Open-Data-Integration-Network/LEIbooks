@@ -79,7 +79,8 @@ SAVE_TO_DISK = True
 
 ```
 jupyter-gleifbooks/
-├── 2025-10-07_MappingExercise_v1.0.ipynb  # Mapping notebook
+├── LegalEntityEvents.ipynb  # LegalEntityEvents notebook
+├── MappingExercise.ipynb    # Mapping notebook
 ├── requirements.txt                        # Python dependencies
 ├── README.md                              # This documentation file
 ├── LICENSE.md                             # License information
@@ -90,6 +91,7 @@ jupyter-gleifbooks/
 │   ├── gleif_api_utils.py                # GLEIF JSON:API client
 │   ├── visualization_utils.py            # Data visualization utilities
 │   └── codelist_utils.py                 # Registration Authority code list utilities
+│   └── column_names_utils.py             # Golden Copy Column names utilities
 ├── cache/                                 # Cached data files (auto-created)
 ├── gc_downloads/                          # Golden Copy downloads (if SAVE_TO_DISK=True)
 ├── downloads/                             # Mapping file downloads (if SAVE_TO_DISK=True)
