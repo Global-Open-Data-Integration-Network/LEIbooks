@@ -11,12 +11,15 @@ if str(utils_dir) not in sys.path:
 # Import the main classes
 from .download_utils import GoldenCopyDownload
 from .gleif_api_utils import GLEIFAPI
-from .visualization_utils import Visualizations
+from .visualization_utils import Visualizations, LegalEntityEventsVisualizer
 from .codelist_utils import Codelists
+from .column_names_utils import ColumnNames
 
 __all__ = [
     "GoldenCopyDownload",
     "GLEIFAPI",
     "Visualizations",
+    "LegalEntityEventsVisualizer",
     "Codelists",
+    "ColumnNames"
 ]

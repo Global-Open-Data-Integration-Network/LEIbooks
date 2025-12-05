@@ -1,7 +1,7 @@
 import time
 import requests
-from typing import Optional, Dict, Any
-
+from typing import Optional, Dict, Any, Iterator, List
+import pandas as pd
 
 class GLEIFAPI:
     """
@@ -58,3 +58,69 @@ class GLEIFAPI:
         """
         payload = self._get(f"lei-records/{lei}")
         return (payload.get("data") or {}).get("attributes", {}) or {}
+
+    def all_pages(self, query: str, max_pages: Optional[int] = None) -> Iterator[Dict[str, Any]]:
+        """
+        Paginate through API responses, following 'next' links until exhausted or max_pages is reached.
+        """
+        url = query
+        page_count = 0
+        
+        while url:
+            if max_pages is not None and page_count >= max_pages:
+                break
+            
+            body = self._get(url)
+            
+            # Handle empty or invalid responses
+            if not body or not isinstance(body, dict):
+                break
+                
+            yield body
+            
+            # Get next page URL from links
+            links = body.get("links", {})
+            url = links.get("next") if isinstance(links, dict) else None
+            page_count += 1
+
+
+    def fetch_field_modifications(
+        self,
+        lei: str,
+        page_limit: int = 200,
+        max_pages: int = 3
+    ) -> pd.DataFrame:
+        """
+        Fetch field-modifications from GLEIF with optional server-side field filtering.
+        """
+        # Build query URL with pagination parameter (handle existing query params)
+        query = f"{self.base_url}/lei-records/{lei}/field-modifications?page[limit]={page_limit}"
+        rows: List[Dict[str, Any]] = []
+
+        for page in self.all_pages(query, max_pages=max_pages):
+            for it in page.get("data") or []:
+                if it.get("type") != "field-modifications":
+                    continue
+
+                attrs = it.get("attributes", {})
+                full_field = attrs.get("field", "")
+
+                # Pick last part after slash, if exists
+                parts = full_field.split("/")
+
+                # keep only EndNode from RR and ignore StartNode
+                if any(p.startswith("rr:EndNode") for p in parts):
+                    simple_field = parts[-1]
+                elif any(p.startswith("rr:StartNode") for p in parts):
+                    continue
+                else:
+                    simple_field = parts[-1]
+                    
+                rows.append({
+                    "Field": simple_field,
+                    "Previous value": attrs.get("valueOld"),
+                    "New value": attrs.get("valueNew"),
+                    "modification_date": attrs.get("date"),
+                })
+
+        return pd.DataFrame(rows).drop_duplicates().reset_index(drop=True)
