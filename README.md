@@ -78,9 +78,10 @@ SAVE_TO_DISK = True
 ## Project Structure
 
 ```
-jupyter-gleifbooks/
+leibooks/
 ├── LegalEntityEvents.ipynb  # LegalEntityEvents notebook
 ├── MappingExercise.ipynb    # Mapping notebook
+├── ISO20022.ipynb           # Name and Address Transformation to ISO 20022 notebook
 ├── requirements.txt                        # Python dependencies
 ├── README.md                              # This documentation file
 ├── LICENSE.md                             # License information
@@ -92,6 +93,7 @@ jupyter-gleifbooks/
 │   ├── visualization_utils.py            # Data visualization utilities
 │   └── codelist_utils.py                 # Registration Authority code list utilities
 │   └── column_names_utils.py             # Golden Copy Column names utilities
+│   └── textxml_utils.py                  # Text and XML utilities
 ├── cache/                                 # Cached data files (auto-created)
 ├── gc_downloads/                          # Golden Copy downloads (if SAVE_TO_DISK=True)
 ├── downloads/                             # Mapping file downloads (if SAVE_TO_DISK=True)

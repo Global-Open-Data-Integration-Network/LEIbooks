@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import math
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Alignment
 from typing import Any, Optional, List
 import ipywidgets as widgets
 from IPython.display import display, Markdown, HTML
@@ -523,3 +525,269 @@ class LegalEntityEventsVisualizer:
         if self.data.leis:
             self._update_dates({"new": self.data.leis[0]})
 
+class NameAddressResultVisualizer:
+    """Format LEI-to-ISO20022 result tables for notebook and Excel output."""
+
+    def __init__(
+        self,
+        text_formatter=None,
+        special_text_columns=None,
+        special_text_passthrough_values=None,
+        highlight_fill_hex: str = "DFFBC0",
+        highlight_css: str = "#DFFBC0",
+        default_bg_css: str = "#FFFFFF",
+        default_text_css: str = "#000000",
+        column_width_px: int = 260,
+        column_width_px_map: Optional[dict[str, int]] = None,
+        column_bg_css_map: Optional[dict[str, str]] = None,
+        column_width_excel: int = 36,
+    ) -> None:
+        self.text_formatter = text_formatter
+        self.special_text_columns = special_text_columns or []
+        self.special_text_passthrough_values = set(special_text_passthrough_values or [])
+        self.highlight_fill_hex = highlight_fill_hex
+        self.highlight_css = highlight_css
+        self.default_bg_css = default_bg_css
+        self.default_text_css = default_text_css
+        self.column_width_px = column_width_px
+        self.column_width_px_map = column_width_px_map or {}
+        self.column_bg_css_map = column_bg_css_map or {}
+        self.column_width_excel = column_width_excel
+
+    @staticmethod
+    def _normalize_value(value):
+        """Normalize values used as mapping keys."""
+        if value is None:
+            return ""
+        return str(value).strip().lower()
+
+    def _prepare_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        prepared = df.copy()
+
+        if self.text_formatter:
+            for col in self.special_text_columns:
+                if col in prepared.columns:
+                    prepared[col] = prepared[col].apply(
+                        lambda x: x
+                        if x in self.special_text_passthrough_values
+                        else self.text_formatter(x)
+                    )
+
+        return prepared
+
+    @staticmethod
+    def _as_pre(value):
+        """Render values in a `<pre>` block for notebook display."""
+        if pd.isna(value) or value is None:
+            return ""
+        return (
+            "<pre style='margin:0; white-space:pre-wrap; "
+            f"font-family:monospace;'>{str(value)}</pre>"
+        )
+
+    def _highlight_selected_cells(
+        self,
+        row,
+        source_column_to_target_map,
+    ):
+        styles = pd.Series("", index=row.index)
+
+        for source_col, mapping in source_column_to_target_map.items():
+            selected_value = self._normalize_value(row.get(source_col, ""))
+            target_col = mapping.get(selected_value)
+
+            if target_col and str(row.get(target_col, "")).strip():
+                styles[target_col] = f"background-color: {self.highlight_css} !important;"
+
+        return styles
+
+    def display_notebook(
+        self,
+        result_df: pd.DataFrame,
+        visible_columns,
+        helper_columns=None,
+        source_column_to_target_map=None,
+        preformatted_columns=None,
+    ):
+        """Return a styled dataframe for notebook display.
+
+        ``source_column_to_target_map`` maps source selector values to
+        destination columns that should be highlighted.
+        """
+        helper_columns = helper_columns or []
+        source_column_to_target_map = source_column_to_target_map or {}
+        preformatted_columns = preformatted_columns or []
+
+        df = self._prepare_dataframe(result_df)
+        style_df = df[list(visible_columns) + list(helper_columns)].copy()
+
+        for col in preformatted_columns:
+            if col in style_df.columns:
+                style_df[col] = style_df[col].apply(self._as_pre)
+
+        styler = style_df.style
+
+        if source_column_to_target_map:
+            styler = styler.apply(
+                lambda row: self._highlight_selected_cells(row, source_column_to_target_map),
+                axis=1,
+            )
+
+        if helper_columns:
+            styler = styler.hide(axis="columns", subset=helper_columns)
+
+        if preformatted_columns:
+            styler = styler.format(
+                {col: (lambda x: x) for col in preformatted_columns},
+                escape=None,
+            )
+
+        styler = styler.set_properties(
+            **{
+                "text-align": "left",
+                "vertical-align": "top",
+                "max-width": f"{self.column_width_px}px",
+                "min-width": f"{self.column_width_px}px",
+                "width": f"{self.column_width_px}px",
+                "white-space": "pre-wrap",
+                "color": self.default_text_css,
+            }
+        ).set_table_styles(
+            [
+                {
+                    "selector": "table",
+                    "props": [
+                        ("border-collapse", "collapse"),
+                    ],
+                },
+                {
+                    "selector": "td",
+                    "props": [
+                        ("background-color", self.default_bg_css),
+                        ("border", "1px solid #cccccc !important"),
+                    ],
+                },
+                {
+                    "selector": "th",
+                    "props": [
+                        ("text-align", "left"),
+                        ("vertical-align", "top"),
+                        ("max-width", f"{self.column_width_px}px"),
+                        ("min-width", f"{self.column_width_px}px"),
+                        ("width", f"{self.column_width_px}px"),
+                        ("background-color", self.default_bg_css),
+                        ("color", self.default_text_css),
+                        ("border", "1px solid #cccccc !important"),
+                    ],
+                }
+            ]
+        )
+
+        if self.column_width_px_map:
+            # Use CSS selectors to target specific columns
+            col_index_map = {col: idx for idx, col in enumerate(style_df.columns)}
+            width_styles = []
+            for col, width in self.column_width_px_map.items():
+                if col not in col_index_map:
+                    continue
+                width_css = f"{int(width)}px"
+                col_idx = col_index_map[col]
+                width_styles.extend(
+                    [
+                        {
+                            "selector": f"th.col_heading.level0.col{col_idx}",
+                            "props": [
+                                ("max-width", width_css),
+                                ("min-width", width_css),
+                                ("width", width_css),
+                            ],
+                        },
+                        {
+                            "selector": f"td.col{col_idx}",
+                            "props": [
+                                ("max-width", width_css),
+                                ("min-width", width_css),
+                                ("width", width_css),
+                            ],
+                        },
+                    ]
+                )
+            if width_styles:
+                styler = styler.set_table_styles(width_styles, overwrite=False)
+
+        if self.column_bg_css_map:
+            col_index_map = {col: idx for idx, col in enumerate(style_df.columns)}
+            bg_styles = []
+            for col, color in self.column_bg_css_map.items():
+                if col not in col_index_map or not color:
+                    continue
+                col_idx = col_index_map[col]
+                bg_styles.extend(
+                    [
+                        {
+                            "selector": f"th.col_heading.level0.col{col_idx}",
+                            "props": [("background-color", color)],
+                        },
+                        {
+                            "selector": f"td.col{col_idx}",
+                            "props": [("background-color", color)],
+                        },
+                    ]
+                )
+            if bg_styles:
+                styler = styler.set_table_styles(bg_styles, overwrite=False)
+
+        return styler
+
+    def save_excel(
+        self,
+        result_df: pd.DataFrame,
+        output_file: str,
+        visible_columns,
+        source_column_to_target_map=None,
+    ) -> None:
+        """Save selected columns to Excel and apply optional highlights."""
+        source_column_to_target_map = source_column_to_target_map or {}
+
+        df = self._prepare_dataframe(result_df)
+        export_df = df[list(visible_columns)].copy()
+        export_df.to_excel(output_file, index=False)
+
+        wb = load_workbook(output_file)
+        ws = wb.active
+
+        highlight_fill = PatternFill(
+            fill_type="solid",
+            start_color=self.highlight_fill_hex,
+            end_color=self.highlight_fill_hex,
+        )
+
+        col_idx = {col: i + 1 for i, col in enumerate(visible_columns)}
+
+        for column_cells in ws.columns:
+            col_letter = column_cells[0].column_letter
+            ws.column_dimensions[col_letter].width = self.column_width_excel
+
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(
+                    wrap_text=True,
+                    vertical="top",
+                    horizontal="left",
+                )
+
+        if source_column_to_target_map:
+            # enumerate over displayed/exported rows, not DataFrame index labels
+            for excel_row, row in enumerate(df.to_dict("records"), start=2):
+                for source_col, mapping in source_column_to_target_map.items():
+                    selected_value = self._normalize_value(row.get(source_col, ""))
+                    target_col = mapping.get(selected_value)
+
+                    if (
+                        target_col
+                        and target_col in col_idx
+                        and str(row.get(target_col, "")).strip()
+                    ):
+                        ws.cell(row=excel_row, column=col_idx[target_col]).fill = highlight_fill
+
+        wb.save(output_file)

@@ -6,7 +6,8 @@ class ColumnNames:
     ESSENTIAL_COLUMNS = [
         "LEI",
         "Entity.LegalName",
-        "Registration.RegistrationStatus"
+        "Entity.LegalName.xmllang",
+        "Registration.RegistrationStatus",
     ]
 
     REGISTRATION_COLUMNS = [
@@ -52,3 +53,112 @@ class ColumnNames:
         "Entity.SuccessorEntity.5.SuccessorLEI",
     ]
 
+    LEGAL_ADDRESS_COLUMNS = [
+    "Entity.LegalAddress.xmllang",
+        "Entity.LegalAddress.FirstAddressLine",
+        "Entity.LegalAddress.AddressNumber",
+        "Entity.LegalAddress.AddressNumberWithinBuilding",
+        "Entity.LegalAddress.MailRouting",
+        "Entity.LegalAddress.AdditionalAddressLine.1",
+        "Entity.LegalAddress.AdditionalAddressLine.2",
+        "Entity.LegalAddress.AdditionalAddressLine.3",
+        "Entity.LegalAddress.City",
+        "Entity.LegalAddress.Region",
+        "Entity.LegalAddress.Country",
+        "Entity.LegalAddress.PostalCode",
+    ]
+
+    OTHER_NAMES_COLUMNS = [
+        "Entity.OtherEntityNames.OtherEntityName.1",
+        "Entity.OtherEntityNames.OtherEntityName.1.xmllang",
+        "Entity.OtherEntityNames.OtherEntityName.1.type",
+        "Entity.OtherEntityNames.OtherEntityName.2",
+        "Entity.OtherEntityNames.OtherEntityName.2.xmllang",
+        "Entity.OtherEntityNames.OtherEntityName.2.type",
+        "Entity.OtherEntityNames.OtherEntityName.3",
+        "Entity.OtherEntityNames.OtherEntityName.3.xmllang",
+        "Entity.OtherEntityNames.OtherEntityName.3.type",
+        "Entity.OtherEntityNames.OtherEntityName.4",
+        "Entity.OtherEntityNames.OtherEntityName.4.xmllang",
+        "Entity.OtherEntityNames.OtherEntityName.4.type",
+        "Entity.OtherEntityNames.OtherEntityName.5",
+        "Entity.OtherEntityNames.OtherEntityName.5.xmllang",
+        "Entity.OtherEntityNames.OtherEntityName.5.type"
+    ]
+
+    TRANSLITERATED_OTHER_NAMES_COLUMNS = [
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.1",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.1.xmllang",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.1.type",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.2",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.2.xmllang",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.2.type",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.3",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.3.xmllang",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.3.type",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.4",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.4.xmllang",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.4.type",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.5",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.5.xmllang",
+        "Entity.TransliteratedOtherEntityNames.TransliteratedOtherEntityName.5.type"
+    ]
+    
+    
+    OTHER_ADDRESS_COLUMNS = [
+    "Entity.OtherAddresses.OtherAddress.1.xmllang",
+        "Entity.OtherAddresses.OtherAddress.1.type",
+        "Entity.OtherAddresses.OtherAddress.1.FirstAddressLine",
+        "Entity.OtherAddresses.OtherAddress.1.AddressNumber",
+        "Entity.OtherAddresses.OtherAddress.1.AddressNumberWithinBuilding",
+        "Entity.OtherAddresses.OtherAddress.1.MailRouting",
+        "Entity.OtherAddresses.OtherAddress.1.AdditionalAddressLine.1",
+        "Entity.OtherAddresses.OtherAddress.1.AdditionalAddressLine.2",
+        "Entity.OtherAddresses.OtherAddress.1.AdditionalAddressLine.3",
+        "Entity.OtherAddresses.OtherAddress.1.City",
+        "Entity.OtherAddresses.OtherAddress.1.Region",
+        "Entity.OtherAddresses.OtherAddress.1.Country",
+        "Entity.OtherAddresses.OtherAddress.1.PostalCode",
+        "Entity.OtherAddresses.OtherAddress.2.xmllang",
+        "Entity.OtherAddresses.OtherAddress.2.type",
+        "Entity.OtherAddresses.OtherAddress.2.FirstAddressLine",
+        "Entity.OtherAddresses.OtherAddress.2.AddressNumber",
+        "Entity.OtherAddresses.OtherAddress.2.AddressNumberWithinBuilding",
+        "Entity.OtherAddresses.OtherAddress.2.MailRouting",
+        "Entity.OtherAddresses.OtherAddress.2.AdditionalAddressLine.1",
+        "Entity.OtherAddresses.OtherAddress.2.AdditionalAddressLine.2",
+        "Entity.OtherAddresses.OtherAddress.2.AdditionalAddressLine.3",
+        "Entity.OtherAddresses.OtherAddress.2.City",
+        "Entity.OtherAddresses.OtherAddress.2.Region",
+        "Entity.OtherAddresses.OtherAddress.2.Country",
+        "Entity.OtherAddresses.OtherAddress.2.PostalCode",
+    ]
+
+    TRANSLITERATED_OTHER_ADDRESS_COLUMNS = [
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.xmllang",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.type",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.FirstAddressLine",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.AddressNumber",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.AddressNumberWithinBuilding",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.MailRouting",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.AdditionalAddressLine.1",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.AdditionalAddressLine.2",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.AdditionalAddressLine.3",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.City",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.Region",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.Country",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.1.PostalCode",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.xmllang",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.type",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.FirstAddressLine",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.AddressNumber",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.AddressNumberWithinBuilding",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.MailRouting",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.AdditionalAddressLine.1",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.AdditionalAddressLine.2",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.AdditionalAddressLine.3",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.City",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.Region",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.Country",
+        "Entity.TransliteratedOtherAddresses.TransliteratedOtherAddress.2.PostalCode",
+    ]
