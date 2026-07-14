@@ -77,7 +77,7 @@ class Visualizations:
         fig, ax = plt.subplots(figsize=(14, 8))
 
         # Use turquoise color scheme consistent with existing visualizations
-        colors = ["#123235", "#79D7C5", "#403E74", "#4D979B", "#4DA2F8"]
+        colors = ["#123235", "#79D7C5", "#403E74", "#4D979B", "#4DA2F8", "#DFFBC0"]
 
         # Create stacked bars
         bottom = np.zeros(len(top_jurisdiction_names))
