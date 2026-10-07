@@ -5,9 +5,9 @@ from matplotlib.patches import Circle
 import math
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Alignment
-from typing import Any, Optional, List
+from typing import Any, Callable, Optional, List, Sequence
 import ipywidgets as widgets
-from IPython.display import display, Markdown, HTML
+from IPython.display import display, Markdown, HTML, clear_output
 
 class Visualizations:
     """
@@ -77,7 +77,7 @@ class Visualizations:
         fig, ax = plt.subplots(figsize=(14, 8))
 
         # Use turquoise color scheme consistent with existing visualizations
-        colors = ["#123235", "#79D7C5", "#403E74", "#4D979B", "#4DA2F8", "#DFFBC0"]
+        colors = ["#123235", "#79D7C5", "#403E74", "#4D979B", "#4DA2F8"]
 
         # Create stacked bars
         bottom = np.zeros(len(top_jurisdiction_names))
@@ -791,3 +791,638 @@ class NameAddressResultVisualizer:
                         ws.cell(row=excel_row, column=col_idx[target_col]).fill = highlight_fill
 
         wb.save(output_file)
+
+
+class DataAlertsVisualizer:
+    """
+    LEI dropdown + grouped change display for Data Alerts.
+    """
+
+    GROUP_ORDER = [
+        "Entity / Legal Identity",
+        "Legal Address",
+        "Headquarters Address",
+        "Address",
+        "Registration / Validation",
+        "Legal Entity Events (LEE)",
+        "Parent Relationships",
+        "Reporting Exceptions",
+        "Other",
+    ]
+
+    CATEGORY_ORDER = [
+        "All Changes",
+        "Entity / Legal Identity",
+        "Legal Address",
+        "Headquarters Address",
+        "Address",
+        "Registration / Validation",
+        "Legal Entity Events (LEE)",
+        "Parent Relationships",
+        "Reporting Exceptions",
+        "Other",
+    ]
+
+    def __init__(
+        self,
+        leis: Sequence[str],
+        result_fn: Callable[[str], dict],
+        title: str = "Data Alerts",
+        source_label: str = "baseline",
+        show_category_filter: bool = False,
+        on_refresh: Optional[Callable[[], Sequence[str]]] = None,
+    ) -> None:
+        self.result_fn = result_fn
+        self.title = title
+        self.source_label = source_label
+        self.on_refresh = on_refresh
+        self.show_category_filter = show_category_filter
+        self.current_result = None
+        self.current_lei = None
+
+        self.lei_dropdown = widgets.Dropdown(
+            options=list(leis),
+            description="LEI:",
+            layout=widgets.Layout(width="520px"),
+            style={"description_width": "60px"},
+        )
+
+        self.category_dropdown = widgets.Dropdown(
+            options=["All Changes"],
+            value="All Changes",
+            description="Category:",
+            layout=widgets.Layout(width="360px"),
+            style={"description_width": "80px"},
+        )
+
+        self.refresh_button = widgets.Button(
+            description="New random sample",
+            tooltip="Select another random set of LEIs",
+        )
+        self.output_widget = widgets.Output()
+
+        self.lei_dropdown.observe(
+            self._on_lei_change,
+            names="value",
+        )
+
+        self.category_dropdown.observe(
+            self._on_category_change,
+            names="value",
+        )
+
+        self.refresh_button.on_click(
+            self._on_refresh_click
+        )
+
+    # ---------- Display helpers ----------
+
+    @staticmethod
+    def format_modification_date(value: Any) -> str:
+        """Format a modification date for display."""
+        if value is None:
+            return "n/a"
+
+        ts = pd.to_datetime(
+            value,
+            errors="coerce",
+            utc=True,
+        )
+
+        if pd.isna(ts):
+            return "n/a"
+
+        return ts.strftime("%Y-%m-%d")
+
+    @classmethod
+    def display_grouped_changes(cls, changes: pd.DataFrame) -> None:
+        """Render changes under Cyprus-colored group headings with consistent table formatting."""
+        if changes is None or changes.empty:
+            return
+
+        display_cols = [
+            c
+            for c in [
+                "Field",
+                "Previous Value",
+                "Current Value",
+            ]
+            if c in changes.columns
+        ]
+
+        if "Logical Group" not in changes.columns:
+            return
+
+        available_groups = set(changes["Logical Group"].dropna().unique())
+
+        # Include any unexpected groups so that changes are never hidden.
+        remaining_groups = [
+            group
+            for group in available_groups
+            if group not in cls.GROUP_ORDER
+        ]
+
+        for group in cls.GROUP_ORDER + remaining_groups:
+
+            if group not in available_groups:
+                continue
+
+            group_data = (
+                changes[changes["Logical Group"] == group][display_cols]
+                .reset_index(drop=True)
+            )
+
+            color = "#027361"
+            n = len(group_data)
+
+            display(
+                HTML(
+                    f"""
+                    <div style="
+                        background-color: {color};
+                        color: white;
+                        padding: 9px 14px;
+                        margin-top: 18px;
+                        margin-bottom: 7px;
+                        border-radius: 5px;
+                        font-size: 16px;
+                        font-weight: 600;
+                    ">
+                        {group}
+                        <span style="
+                            font-size: 12px;
+                            font-weight: normal;
+                            margin-left: 6px;
+                        ">
+                            ({n} change{"s" if n != 1 else ""})
+                        </span>
+                    </div>
+                    """
+                )
+            )
+
+            styled = (
+                group_data.style.set_table_attributes(
+                    'style="width:100%; table-layout:fixed;"'
+                )
+
+                .set_table_styles(
+                    [
+                        {
+                            "selector": "table",
+                            "props": [
+                                ("width", "100%"),
+                                ("table-layout", "fixed"),
+                                ("border-collapse", "collapse"),
+                            ],
+                        },
+                        {
+                            "selector": "th",
+                            "props": [
+                                (
+                                    "background-color",
+                                    "#D9F4F4",
+                                ),
+                                (
+                                    "color",
+                                    "#003336",
+                                ),
+                                (
+                                    "font-weight",
+                                    "bold",
+                                ),
+                                (
+                                    "text-align",
+                                    "left",
+                                ),
+                                (
+                                    "padding",
+                                    "8px",
+                                ),
+                                (
+                                    "border-bottom",
+                                    "2px solid #003336",
+                                ),
+                                (
+                                    "border-right",
+                                    "1px solid #B2DFDB",
+                                ),
+                            ],
+                        },
+                        {
+                            "selector": "td",
+                            "props": [
+                                ("text-align","left"),
+                                ("padding", "8px"),
+                                ("vertical-align", "top"),
+                                ("border-bottom", "1px solid #E5E5E5"),
+                                ("border-right", "1px solid #E0E0E0"),
+                                (
+                                    "word-wrap",
+                                    "break-word",
+                                ),
+                            ],
+                        },
+                        {
+                            "selector": "th:nth-child(1)",
+                            "props": [
+                                ("width", "30%"),
+                            ],
+                        },
+                        {
+                            "selector": "th:nth-child(2)",
+                            "props": [
+                                ("width", "35%"),
+                            ],
+                        },
+                        {
+                            "selector": "th:nth-child(3)",
+                            "props": [
+                                ("width", "35%"),
+                            ],
+                        },
+                        {
+                            "selector": "th:last-child",
+                            "props": [
+                                ("border-right", "none"),
+                            ],
+                        },
+                        {
+                            "selector": "td:last-child",
+                            "props": [("border-right", "none"),],
+                        },
+                    ]
+                )
+                .set_properties(
+                    **{
+                        "white-space": "normal",
+                        "word-wrap": "break-word",
+                        "text-align": "left",
+                    }
+                )
+                .hide(axis="index")
+            )
+            display(styled)
+
+    # Category helpers
+    @classmethod
+    def available_categories(
+        cls,
+        result: dict,
+    ) -> list:
+
+        changes = result.get(
+            "changes",
+            pd.DataFrame(),
+        )
+
+        if (
+            changes is None
+            or changes.empty
+            or "Logical Group" not in changes.columns
+        ):
+            return ["All Changes"]
+
+        present = set(
+            changes["Logical Group"]
+            .dropna()
+            .tolist()
+        )
+
+        categories = [
+            category
+            for category in cls.CATEGORY_ORDER
+            if (
+                category == "All Changes"
+                or category in present
+            )
+        ]
+
+        # Keep unexpected groups available too.
+        extra_categories = [
+            group
+            for group in present
+            if group not in categories
+        ]
+
+        return categories + extra_categories
+
+
+    @staticmethod
+    def filter_changes_by_category(
+        changes: pd.DataFrame,
+        category: str,
+    ) -> pd.DataFrame:
+
+        if (
+            changes is None
+            or changes.empty
+            or category == "All Changes"
+        ):
+            return changes
+
+        if "Logical Group" not in changes.columns:
+            return changes
+
+        return changes[
+            changes["Logical Group"] == category
+        ].copy()
+
+
+    def show_lei(self, lei: str) -> None:
+        """Get and display the result for one LEI."""
+
+        if not lei:
+            return
+
+        self.current_lei = lei
+
+        result = self.result_fn(lei) or {}
+
+        self.current_result = result
+        # Update categories when LEI changes
+        if self.show_category_filter:
+
+            categories = self.available_categories(
+                result
+            )
+            self.category_dropdown.unobserve(
+                self._on_category_change,
+                names="value",
+            )
+
+            self.category_dropdown.options = categories
+
+            if "All Changes" in categories:
+                self.category_dropdown.value = "All Changes"
+            elif categories:
+                self.category_dropdown.value = categories[0]
+
+            self.category_dropdown.observe(
+                self._on_category_change,
+                names="value",
+            )
+
+        self._render_result(result)
+
+    # Render current result
+
+    def _render_result(
+        self,
+        result: dict,
+    ) -> None:
+
+        with self.output_widget:
+
+            clear_output(wait=True)
+
+            lei = self.current_lei
+            display(
+                HTML(
+                    f"""
+                    <div style="
+                        color: #003336;
+                        font-size: 18px;
+                        font-weight: 600;
+                        margin-bottom: 4px;
+                    ">
+                        {self.title}
+                    </div>
+                    <div style="
+                        color: #003336;
+                        font-size: 16px;
+                        font-weight: 600;
+                        margin-bottom: 12px;
+                    ">
+                        LEI: {lei}
+                    </div>
+                    """
+                )
+            )
+
+            status = result.get("status")
+            changes = result.get("changes",pd.DataFrame())
+            lookback = result.get("lookback_days")
+            latest = result.get("latest_modification_date")
+
+            if status == "NEW":
+                display(
+                    HTML(
+                        """
+                        <div style="
+                            background-color: #E6F7F7;
+                            border-left: 4px solid #027361;
+                            padding: 12px;
+                            border-radius: 3px;
+                        ">
+                            <b>New LEI</b><br>
+                            This LEI does not exist in the
+                            selected Golden Copy baseline
+                            (new registration).
+                        </div>
+                        """
+                    )
+                )
+                return
+
+            if status == "MISSING":
+                display(
+                    HTML(
+                        """
+                        <div style="
+                            background-color: #F3F8F8;
+                            border-left: 4px solid #5F9EA0;
+                            padding: 12px;
+                            border-radius: 3px;
+                        ">
+                            <b>LEI not found</b><br>
+                            This LEI is not present in the current source data.
+                        </div>
+                        """
+                    )
+                )
+                return
+
+            if status == "NO_CHANGE":
+                if lookback is not None:
+                    msg = (
+                        f"No modification exists in the "
+                        f"last {lookback} days."
+                    )
+                else:
+                    msg = (
+                        "No field-level differences remain "
+                        "after value normalization."
+                    )
+
+                display(
+                    HTML(
+                        f"""
+                        <div style="
+                            background-color: #F3F8F8;
+                            border-left: 4px solid #5F9EA0;
+                            padding: 12px;
+                            border-radius: 3px;
+                        ">
+                            <b>No changes found</b><br>
+                            {msg}
+                        </div>
+                        """
+                    )
+                )
+                return
+
+            if self.show_category_filter:
+
+                changes = self.filter_changes_by_category(
+                    changes,
+                    self.category_dropdown.value,
+                )
+
+            # Category exists but no rows
+            if changes is None or changes.empty:
+
+                display(
+                    HTML(
+                        """
+                        <div style="
+                            background-color: #F3F8F8;
+                            border-left: 4px solid #5F9EA0;
+                            padding: 12px;
+                            border-radius: 3px;
+                        ">
+                            <b>No changes found</b><br>
+                            No changes are available for the
+                            selected category.
+                        </div>
+                        """
+                    )
+                )
+
+                return
+            
+            n = len(changes)
+
+            latest_txt = ""
+
+            if latest is not None:
+                latest_txt = (
+                    " Latest modification date: "
+                    f"<b>{self.format_modification_date(latest)}</b>."
+                )
+
+            display(
+                HTML(
+                    f"""
+                    <div style="margin-bottom: 8px; color: #555;">
+                        <b>{n}</b>field{"s" if n != 1 else ""} changed
+                        compared with the {self.source_label}.{latest_txt}
+                    </div>
+                    """
+                )
+            )
+
+            self.display_grouped_changes(changes)
+
+    # ---------- Widget callbacks ----------
+
+    def _on_lei_change(self, change,) -> None:
+        if (change.get("name") == "value" and change.get("new")):
+            self.show_lei(change["new"])
+
+    def _on_category_change(self,change,) -> None:
+        if (
+            change.get("name") == "value"
+            and self.current_result is not None
+        ):
+            self._render_result(
+                self.current_result
+            ) 
+    def _on_refresh_click(self, _button) -> None:
+
+        if self.on_refresh is None:
+            return
+
+        sample = list(self.on_refresh())
+        self.set_leis(sample)
+
+    def set_leis(self, leis: Sequence[str]) -> None:
+        """Replace dropdown options."""
+        leis = list(leis)
+
+        self.lei_dropdown.unobserve(
+            self._on_lei_change,
+            names="value",
+        )
+
+        self.lei_dropdown.options = leis
+
+        if leis:
+            self.lei_dropdown.value = leis[0]
+
+        self.lei_dropdown.observe(
+            self._on_lei_change,
+            names="value",
+        )
+
+        if leis:
+            self.show_lei(leis[0])
+
+    def display(self, static: bool = False) -> None:
+        """Show dropdown, optional refresh button, and initial LEI result."""
+
+        if static:
+            # Get result for the selected LEI
+            lei = self.lei_dropdown.value
+            result = self.result_fn(lei) or {}
+
+            changes = result.get("changes",pd.DataFrame(),)
+
+            if self.show_category_filter:
+                changes = self.filter_changes_by_category(
+                    changes,
+                    self.category_dropdown.value,
+                )
+
+            display(
+                HTML(
+                    f"""
+                    <div style="
+                        color:#003336;
+                        font-size:18px;
+                        font-weight:600;
+                        margin-bottom:4px;
+                    ">
+                        {self.title}
+                    </div>
+
+                    <div style="
+                        color:#003336;
+                        font-size:16px;
+                        font-weight:600;
+                        margin-bottom:12px;
+                    ">
+                        LEI: {lei}
+                    </div>
+                    """
+                )
+            )
+
+            if changes is not None and not changes.empty:
+                self.display_grouped_changes(changes)
+
+            return
+
+        controls = [self.lei_dropdown]
+
+        if self.show_category_filter:
+            controls.append(self.category_dropdown)
+
+        if self.on_refresh is not None:
+            controls.append(self.refresh_button)
+
+        display(widgets.HBox(controls))
+        display(self.output_widget)
+
+        if self.lei_dropdown.options:
+            self.show_lei(self.lei_dropdown.value)

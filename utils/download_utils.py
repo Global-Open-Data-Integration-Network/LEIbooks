@@ -3,7 +3,7 @@ import re
 import zipfile
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit, urlunsplit
 from typing import Optional, List, Union
 import io
@@ -16,6 +16,27 @@ class GoldenCopyDownload:
         "json": ".json",
         "xml": ".xml",
     }
+
+    DELTA_TYPES = {
+        "IntraDay",
+        "LastDay",
+        "LastWeek",
+        "LastMonth",
+    }
+
+    DELTA_OFFSETS = {
+        "IntraDay": timedelta(hours=8),
+        "LastDay": timedelta(days=1),
+        "LastWeek": timedelta(days=7),
+        "LastMonth": timedelta(days=31),
+    }
+    
+    FILE_TYPE_VARIANTS = {
+    "lei": "lei2",
+    "rr": "rr",
+    "repex": "repex",
+}
+
     TARGET_DATETIME = re.compile(r"(20\d{6})[-_](\d{4})")  # e.g., 20250813-0800
 
     def __init__(self, page_url, save_dir="./gc_downloads"):
@@ -29,13 +50,28 @@ class GoldenCopyDownload:
         os.makedirs(self.save_dir, exist_ok=True)
 
     @classmethod
-    async def download_for_date(cls, date: str, save_dir: str = "./gc_downloads"):
+    def _get_variant(cls, file_type: str) -> str:
+        """Map file type to the GLEIF Golden Copy variant."""
+
+        file_type = str(file_type).strip().lower()
+
+        if file_type not in cls.FILE_TYPE_VARIANTS:
+            raise ValueError(
+                f"Invalid file_type '{file_type}'. "
+                "Choose from: ['lei', 'rr', 'repex']"
+            )
+
+        return cls.FILE_TYPE_VARIANTS[file_type]
+
+    @classmethod
+    async def download_for_date(cls, date: str, file_type: str = "lei", save_dir: str = "./gc_downloads", time_str: str = "00:00", delta: str = None,):
         """
-        Class method to download GLEIF Golden Copy for a specific date.
+        Class method to download GLEIF Golden Copy or delta file for a specific date.
         This is a more convenient way to use the downloader.
 
         Args:
             date (str): Date in YYYY-MM-DD format
+            file_type (str): lei, rr or repex
             save_dir (str): Directory to save the downloaded file
 
         Returns:
@@ -45,7 +81,7 @@ class GoldenCopyDownload:
             page_url="https://goldencopy.gleif.org/api/v2/golden-copies/publishes/",
             save_dir=save_dir,
         )
-        return await downloader.prepare_download(date)
+        return await downloader.prepare_download(date, file_type=file_type, time_str=time_str, delta=delta)
 
     @classmethod
     def _extract_timestamp_from_url(cls, url: str):
@@ -59,7 +95,7 @@ class GoldenCopyDownload:
             return None
 
     async def find_download_url(
-        self, date_str: str, time_str: str, filetype: str, variant: str
+        self, date_str: str, time_str: str, filetype: str, variant: str, delta: str
     ):
         """
         Search for the matching download link.
@@ -69,6 +105,7 @@ class GoldenCopyDownload:
             time_str (str): HH:MM (24h) or "" to ignore time
             filetype (str): "csv", "json", "xml"
             variant (str): "lei2", "rr", "repex"
+            delta (str, Optional): "IntraDay", "LastDay", "LastWeek", "LastMonth"
 
         Returns:
             str: Download URL
@@ -87,9 +124,49 @@ class GoldenCopyDownload:
         normalized_time = time_str if time_str else "00:00"
         dt_obj = datetime.strptime(f"{date_str} {normalized_time}", "%Y-%m-%d %H:%M")
         time_token = dt_obj.strftime("%Y%m%d-%H%M")
-
         base = self.page_url.rstrip("/")
-        return f"{base}/{variant}/{time_token}{want_ext}"
+        if not delta:
+            return f"{base}/{variant}/{time_token}{want_ext}"
+        
+        delta_offsets = {
+            "intraday": ("IntraDay", timedelta(hours=8)),
+            "lastday": ("LastDay", timedelta(days=1)),
+            "lastweek": ("LastWeek", timedelta(days=7)),
+            "lastmonth": ("LastMonth", timedelta(days=31)),
+        }
+
+        delta_key = delta.lower()
+
+        if delta_key not in delta_offsets:
+            raise ValueError(
+                f"Invalid delta type '{delta}'. "
+                f"Choose from: {list(self.DELTA_TYPES)}"
+            )
+
+        delta_type, delta_offset = delta_offsets[delta_key]
+        delta_datetime = dt_obj + delta_offset
+
+        now = datetime.now()
+
+        if delta_datetime > now:
+            raise RuntimeError(
+                f"{delta_type} delta is not available yet. "
+                f"Golden Copy: "
+                f"{dt_obj.strftime('%Y-%m-%d %H:%M')}. "
+                f"Expected delta publication: "
+                f"{delta_datetime.strftime('%Y-%m-%d %H:%M')}."
+            )
+        delta_time_token = delta_datetime.strftime(
+            "%Y%m%d-%H%M"
+        )
+
+        url = (
+            f"{base}/{variant}/"
+            f"{delta_time_token}{want_ext}"
+            f"?delta={delta_type}"
+        )
+
+        return url    
 
 
     def download_file(self, url: str):
@@ -126,14 +203,15 @@ class GoldenCopyDownload:
         print(f"Downloaded file: {save_path}")
         return os.path.abspath(save_path)
 
-    async def prepare_download(self, date: str):
+    async def prepare_download(self, date: str, file_type: str= "lei", time_str: str = "00:00", delta: str = None):
         """
         Prepare the downloader for the given date.
         Returns the file path if successful, None if failed.
         """
         try:
             # Try to get available file
-            url = await self.find_download_url(date, "00:00", "csv", "lei2")
+            variant = self._get_variant(file_type)
+            url = await self.find_download_url(date, time_str, "csv", variant, delta=delta)
             print(url)
             print("Found URL for:", url)
 
@@ -256,16 +334,20 @@ class GoldenCopyDownload:
     async def download_for_date_in_memory(
         cls, 
         date: str, 
+        file_type: str = "lei",
         save_dir: str = "./gc_downloads",
         columns: Optional[List[str]] = None,
-        keep_in_memory: bool = False
+        keep_in_memory: bool = False,
+        time_str: str = "00:00", 
+        delta: str = None
     ) -> Union[str, pd.DataFrame]:
         """
-        Enhanced class method to download GLEIF Golden Copy for a specific date.
+        Enhanced class method to download GLEIF Golden Copy or Delta file for a specific date.
         Supports column selection and in-memory processing.
         
         Args:
             date: Date in YYYY-MM-DD format
+            file_type: lei, rr or repex
             save_dir: Directory to save the downloaded file (ignored if keep_in_memory=True)
             columns: Optional list of column names to read. If None, reads all columns.
             keep_in_memory: If True, returns DataFrame directly. If False, returns file path.
@@ -280,24 +362,26 @@ class GoldenCopyDownload:
         )
         
         if keep_in_memory:
-            return await downloader.prepare_download_in_memory(date, columns)
+            return await downloader.prepare_download_in_memory(date, columns, file_type=file_type, time_str=time_str,delta=delta)
         else:
-            return await downloader.prepare_download(date)
+            return await downloader.prepare_download(date, file_type=file_type, time_str=time_str,delta=delta)
 
-    async def prepare_download_in_memory(self, date: str, columns: Optional[List[str]] = None) -> pd.DataFrame:
+    async def prepare_download_in_memory(self, date: str, columns: Optional[List[str]] = None, file_type: str = "lei2", time_str: str = "00:00", delta: str = None) -> pd.DataFrame:
         """
         Prepare the downloader for the given date and return data in memory.
         
         Args:
             date: Date in YYYY-MM-DD format
             columns: Optional list of column names to read
+            file_type: lei, rr or repex
             
         Returns:
             pd.DataFrame: The CSV data
         """
         try:
+            variant = self._get_variant(file_type)
             # Try to get available file
-            url = await self.find_download_url(date, "00:00", "csv", "lei2")
+            url = await self.find_download_url(date, time_str, "csv", variant, delta=delta)
             print(f"Found URL for: {url}")
             
             # Download and read directly into memory
@@ -313,16 +397,20 @@ class GoldenCopyDownload:
     async def download_with_config(
         cls,
         date: str,
+        file_type: str,
         save_to_disk: bool = True,
         use_full_dataset: bool = True,
         essential_columns: Optional[List[str]] = None,
-        save_dir: str = "./gc_downloads"
+        save_dir: str = "./gc_downloads",
+        delta: str = None,
+        time: str = "00:00",
     ) -> pd.DataFrame:
         """
-        Download GLEIF Golden Copy data with configuration options.
+        Download GLEIF Golden Copy or Delta data with configuration options.
         
         Args:
             date: Date in YYYY-MM-DD format
+            file_type: lei, rr or repex
             save_to_disk: If True, save to disk; if False, keep in memory only
             use_full_dataset: If True, use all columns; if False, use only essential_columns
             essential_columns: List of column names to use when use_full_dataset=False
@@ -332,21 +420,27 @@ class GoldenCopyDownload:
             pd.DataFrame: The loaded data
         """
         print(f"Downloading data for date: {date}")
-        
+        cls._get_variant(file_type)
         if not save_to_disk:
             print("Downloading data directly to memory...")
             if not use_full_dataset and essential_columns:
                 print(f"Using subset of {len(essential_columns)} columns")
                 level_1_data = await cls.download_for_date_in_memory(
-                    date, 
+                    date,
+                    file_type=file_type, 
                     columns=essential_columns, 
-                    keep_in_memory=True
+                    keep_in_memory=True,
+                    time_str=time,
+                    delta=delta
                 )
             else:
                 print("Using full dataset - Download may take a while")
                 level_1_data = await cls.download_for_date_in_memory(
                     date, 
-                    keep_in_memory=True
+                    file_type=file_type,
+                    keep_in_memory=True,
+                    time_str=time,
+                    delta=delta
                 )
             print(f"Data loaded in memory: {level_1_data.shape[0]:,} rows × {level_1_data.shape[1]} columns")
             
