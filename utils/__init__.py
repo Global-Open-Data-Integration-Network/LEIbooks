@@ -11,9 +11,15 @@ if str(utils_dir) not in sys.path:
 # Import the main classes
 from .download_utils import GoldenCopyDownload
 from .gleif_api_utils import GLEIFAPI
-from .visualization_utils import Visualizations, LegalEntityEventsVisualizer, NameAddressResultVisualizer
+from .visualization_utils import (
+    Visualizations,
+    LegalEntityEventsVisualizer,
+    NameAddressResultVisualizer,
+    DataAlertsVisualizer,
+)
 from .codelist_utils import Codelists
 from .column_names_utils import ColumnNames
+from .data_utils import DataHelper
 from .textxml_utils import TextXml
 
 __all__ = [
@@ -22,7 +28,9 @@ __all__ = [
     "Visualizations",
     "LegalEntityEventsVisualizer",
     "NameAddressResultVisualizer",
+    "DataAlertsVisualizer",
     "Codelists",
     "ColumnNames",
-    "TextXml"
+    "TextXml",
+    "DataHelper",
 ]
