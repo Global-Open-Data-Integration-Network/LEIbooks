@@ -88,6 +88,7 @@ leibooks/
 ├── .gitignore                             # Git ignore patterns
 ├── utils/                                 # Utility modules package
 │   ├── __init__.py                       # Package initialization and environment setup
+│   ├── data_utils.py                     # Data preparing utilities 
 │   ├── download_utils.py                 # GLEIF Golden Copy download utilities
 │   ├── gleif_api_utils.py                # GLEIF JSON:API client
 │   ├── visualization_utils.py            # Data visualization utilities
