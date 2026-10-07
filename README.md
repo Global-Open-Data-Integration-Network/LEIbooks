@@ -82,6 +82,7 @@ leibooks/
 ├── LegalEntityEvents.ipynb  # LegalEntityEvents notebook
 ├── MappingExercise.ipynb    # Mapping notebook
 ├── ISO20022.ipynb           # Name and Address Transformation to ISO 20022 notebook
+├── DataAlerts.ipynb         # Viewing changes in LEI data notebook
 ├── requirements.txt                        # Python dependencies
 ├── README.md                              # This documentation file
 ├── LICENSE.md                             # License information
